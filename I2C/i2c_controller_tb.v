@@ -79,3 +79,12 @@ module i2c_controller_tb;
 		
 	end      
 endmodule
+/* 
+From the setup:
+Master writes to slave because rw = 0
+Slave address matches 7'b0101010
+The 8-bit data (10101010) is sent from master → slave
+Slave stores data in data_in register during READ_DATA state
+Master checks ready after transaction to know it completed
+No read operation occurs here because rw = 0. If rw = 1, master would read data from slave instead.
+*/
