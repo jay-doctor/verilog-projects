@@ -1,24 +1,30 @@
+/* 
+The testbench instantiates both I²C master and slave, generates clock and reset, 
+applies write stimulus, and allows verification of SDA/SCL behavior in simulation.
+*/
+
 `timescale 1ns / 1ps
 
 module i2c_controller_tb;
 
-	// Inputs
-	reg clk;
-	reg rst;
-	reg [6:0] addr;
-	reg [7:0] data_in;
-	reg enable;
-	reg rw;
+	// Inputs - These represent what a CPU or firmware would control in real hardware:
+	reg clk; // System clock
+	reg rst; // Reset
+	reg [6:0] addr; // Slave address
+	reg [7:0] data_in; // Data to write
+	reg enable; // Start transaction
+	reg rw; // Read / Write selection
 
-	// Outputs
-	wire [7:0] data_out;
-	wire ready;
+	// Outputs - These are observed, not driven
+	wire [7:0] data_out; // Data received from slave
+	wire ready; // Master is idle / ready
 
-	// Bidirs
-	wire i2c_sda;
-	wire i2c_scl;
+	// Bidirs - Bidirectional I²C Lines, Shared between master and slave	
+	wire i2c_sda; // 
+	wire i2c_scl; // 
 
-	// Instantiate the Unit Under Test (UUT)
+	/* Instantiate the Master - Unit Under Test (UUT), 
+	Connects it to TB-driven signals, Shares SDA/SCL with slave */
 	i2c_controller master (
 		.clk(clk), 
 		.rst(rst), 
@@ -32,12 +38,18 @@ module i2c_controller_tb;
 		.i2c_scl(i2c_scl)
 	);
 	
-		
+	// Slave Instantiation
+	/* 
+	Places slave device on same I²C bus
+	No clock/reset needed → slave reacts only to SDA/SCL
+	*/
 	i2c_slave_controller slave (
     .sda(i2c_sda), 
     .scl(i2c_scl)
     );
-	
+
+	// Clock Generator Block
+	// Generates continuous system clock, as Master logic depends on clk
 	initial begin
 		clk = 0;
 		forever begin
@@ -54,16 +66,16 @@ module i2c_controller_tb;
 		#100;
         
 		// Add stimulus here
-		rst = 0;		
-		addr = 7'b0101010;
-		data_in = 8'b10101010;
-		rw = 0;	
-		enable = 1;
+		rst = 0; // Allows system to initialize cleanly
+		rw = 0; // Master will WRITE
+		addr = 7'b0101010; // Select slave
+		data_in = 8'b10101010; // Data to send
+		enable = 1; // Start I²C
 		#10;
-		enable = 0;
+		enable = 0; // Let FSM proceed
 				
 		#500
-		$finish;
+		$finish; // Stops simulation cleanly
 		
 	end      
 endmodule
