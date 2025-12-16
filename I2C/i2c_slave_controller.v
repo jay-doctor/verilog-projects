@@ -1,32 +1,44 @@
 `timescale 1ns / 1ps
 
+/* The I²C slave does NOT generate clock.
+It only:
+- Detects START / STOP
+- Listens to SCL
+- Samples SDA on SCL ↑
+- Drives SDA on SCL ↓ (ACK or data)
+So the slave is reactive, not controlling. */
+
 module i2c_slave_controller(
-	inout sda,
-	inout scl
+	inout sda, // bidirectional data line
+	inout scl // clock from master
 	);
 	
-	localparam ADDRESS = 7'b0101010;
+	localparam ADDRESS = 7'b0101010; // fixed slave address, Slave responds only if master sends this address
 	
-	localparam READ_ADDR = 0;
-	localparam SEND_ACK = 1;
-	localparam READ_DATA = 2;
-	localparam WRITE_DATA = 3;
-	localparam SEND_ACK2 = 4;
+	localparam READ_ADDR = 0; // Receive address + R/W bit
+	localparam SEND_ACK = 1; //Acknowledge address
+	localparam READ_DATA = 2; // Receive data from master
+	localparam WRITE_DATA = 3; // Send data to master
+	localparam SEND_ACK2 = 4; // Acknowledge received data
 	
-	reg [7:0] addr;
-	reg [7:0] counter;
-	reg [7:0] state = 0;
-	reg [7:0] data_in = 0;
-	reg [7:0] data_out = 8'b11001100;
-	reg sda_out = 0;
-	reg sda_in = 0;
-	reg start = 0;
-	reg write_enable = 0;
-	
+	reg [7:0] addr; // store received address byte
+	reg [7:0] counter; // bit counter (7 → 0, MSB first)
+	reg [7:0] state = 0; // FSM current state
+	reg [7:0] data_in = 0; // data written by master
+	reg [7:0] data_out = 8'b11001100; // data sent to master during read
+	reg sda_out = 0; //
+	reg sda_in = 0; //
+	reg start = 0; //
+	reg write_enable = 0; //
+
+	/* write_enable = 1 → slave drives SDA
+	write_enable = 0 → slave releases SDA
+	Implements open-drain behavior
+	This allows master and slave to share SDA safely */
 	assign sda = (write_enable == 1) ? sda_out : 'bz;
 	
 	always @(negedge sda) begin
-		if ((start == 0) && (scl == 1)) begin
+		if ((start == 0) && (scl == 1)) begin // START = SDA goes HIGH → LOW while SCL is HIGH
 			start <= 1;	
 			counter <= 7;
 		end
@@ -39,7 +51,11 @@ module i2c_slave_controller(
 			write_enable <= 0;
 		end
 	end
-	
+
+
+	/* Rule of I²C
+	Data is sampled on SCL rising edge
+	So slave reads SDA only on posedge scl  */
 	always @(posedge scl) begin
 		if (start == 1) begin
 			case(state)
@@ -106,4 +122,10 @@ module i2c_slave_controller(
 			end
 		endcase
 	end
+
+	/* 
+	Slave reads data on SCL rising edge and drives data or ACK on SCL falling edge to follow I²C timing rules.
+	Master decides what to do on posedge and changes SDA on negedge so data is stable when SCL goes high.
+	*/
+	
 endmodule
